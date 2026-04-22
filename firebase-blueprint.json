@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the platform (Customer, Worker, or Admin)",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "worker", "admin"] },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "number", "description": "Timestamp" },
+        "updatedAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["userId", "email", "role", "createdAt", "updatedAt"]
+    },
+    "WorkerProfile": {
+      "title": "WorkerProfile",
+      "description": "Extended profile for workers",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "category": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "rating": { "type": "number" },
+        "completedJobs": { "type": "number" },
+        "rank": { "type": "string", "enum": ["Bronze", "Silver", "Gold", "Platinum", "Elite"] },
+        "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "startingPrice": { "type": "number" },
+        "location": { "type": "string" }
+      },
+      "required": ["userId", "category", "rating", "completedJobs", "rank", "approvalStatus"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "A job posted by a customer",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "workerId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "location": { "type": "string" },
+        "budget": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "assigned", "completed", "cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["customerId", "title", "description", "category", "location", "budget", "status", "paymentStatus", "createdAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Payment record for a job",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "amount": { "type": "number" },
+        "fee": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["jobId", "amount", "fee", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Store all user base profiles"
+    },
+    "/workers/{workerId}": {
+      "schema": { "$ref": "#/entities/WorkerProfile" },
+      "description": "Store extended worker profile details (ID matches userId)"
+    },
+    "/jobs/{jobId}": {
+      "schema": { "$ref": "#/entities/Job" },
+      "description": "Store all active and past jobs"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Store payment records for completed jobs or pending payments"
+    }
+  }
+}
