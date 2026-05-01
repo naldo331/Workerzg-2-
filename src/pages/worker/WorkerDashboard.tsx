@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import UserProfileHeader from '../../components/profile/UserProfileHeader';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 export default function WorkerDashboard() {
   const { currentUser } = useAuth();
@@ -13,6 +14,25 @@ export default function WorkerDashboard() {
   const [openJobs, setOpenJobs] = useState<any[]>([]);
   const [myJobs, setMyJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    isDestructive?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const openConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => {
+    setConfirmDialog({ isOpen: true, title, message, onConfirm, confirmText, isDestructive });
+  };
+  const closeConfirm = () => setConfirmDialog(prev => ({ ...prev, isOpen: false }));
 
   // Load jobs
   useEffect(() => {
@@ -83,6 +103,23 @@ export default function WorkerDashboard() {
     } catch (error) {
       console.error(error);
       toast.error("Failed to accept job. It may be taken.");
+    }
+  };
+
+  const handleDeclineJob = async (jobId: string) => {
+    if (!currentUser) return;
+    try {
+      const jobRef = doc(db, 'jobs', jobId);
+      await updateDoc(jobRef, {
+        status: 'cancelled',
+        workerId: '',
+        updatedAt: Date.now()
+      });
+      toast.success("Job request declined.");
+      setMyJobs(myJobs.filter(j => j.id !== jobId));
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to decline job.");
     }
   };
 
@@ -206,13 +243,34 @@ export default function WorkerDashboard() {
                     <p className="text-sm text-zinc-400 mb-3">{job.location}</p>
                     
                     {job.status === 'assigned' && (
-                      <div className="pt-3 border-t border-zinc-800 flex justify-end">
-                        <button 
-                          onClick={() => handleCompleteJob(job.id)}
-                          className="text-sm bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-md font-semibold transition-colors"
-                        >
-                          Mark as Completed
-                        </button>
+                      <div className="pt-3 border-t border-zinc-800 flex justify-between items-center">
+                        {job.paymentStatus === 'pending' ? (
+                           <div className="flex w-full items-center justify-between">
+                             <span className="text-xs font-bold text-red-500 bg-red-500/10 px-3 py-1.5 rounded">Awaiting Client Payment</span>
+                             <button
+                               onClick={() => openConfirm(
+                                 'Decline Job request',
+                                 'Are you sure you want to decline this job request?',
+                                 () => {
+                                   handleDeclineJob(job.id);
+                                   closeConfirm();
+                                 },
+                                 'Decline',
+                                 true
+                               )}
+                               className="text-xs text-zinc-400 hover:text-red-500 transition-colors underline"
+                             >
+                               Decline
+                             </button>
+                           </div>
+                        ) : (
+                          <button 
+                            onClick={() => handleCompleteJob(job.id)}
+                            className="text-sm bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-md font-semibold transition-colors ml-auto"
+                          >
+                            Mark as Completed
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -223,6 +281,16 @@ export default function WorkerDashboard() {
         </div>
 
       </div>
+
+      <ConfirmModal 
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+        confirmText={confirmDialog.confirmText}
+        isDestructive={confirmDialog.isDestructive}
+      />
     </div>
   );
 }

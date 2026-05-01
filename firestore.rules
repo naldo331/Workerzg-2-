@@ -118,6 +118,8 @@ service cloud.firestore {
         (existing().status == 'open' && incoming().status == 'assigned' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workerId', 'updatedAt']) && incoming().workerId == request.auth.uid) ||
         (request.auth.uid == existing().workerId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
       );
+      
+      allow delete: if isAdmin();
     }
 
     match /transactions/{transactionId} {

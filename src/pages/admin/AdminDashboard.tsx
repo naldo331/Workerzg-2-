@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import toast from 'react-hot-toast';
-import { Users, Briefcase, DollarSign, Ban, CheckCircle, XCircle, Trash2, Shield } from 'lucide-react';
+import { Users, Briefcase, DollarSign, Ban, CheckCircle, XCircle, Trash2, Shield, AlertTriangle } from 'lucide-react';
 import UserProfileHeader from '../../components/profile/UserProfileHeader';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
@@ -12,7 +13,24 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'users' | 'workers' | 'jobs'>('users');
 
-  const [deletingUser, setDeletingUser] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    isDestructive?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const openConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => {
+    setConfirmDialog({ isOpen: true, title, message, onConfirm, confirmText, isDestructive });
+  };
+  const closeConfirm = () => setConfirmDialog(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     async function loadData() {
@@ -81,11 +99,20 @@ export default function AdminDashboard() {
       toast.success("User deleted!");
       setUsers(users.filter(u => u.id !== userId));
       setWorkers(workers.filter(w => w.userId !== userId));
-      setDeletingUser(null);
     } catch (e: any) {
       console.error(e);
       toast.error("Failed to delete user: " + e.message);
-      setDeletingUser(null);
+    }
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      await deleteDoc(doc(db, 'jobs', jobId));
+      toast.success("Job deleted!");
+      setJobs(jobs.filter(j => j.id !== jobId));
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Failed to delete job: " + e.message);
     }
   };
 
@@ -178,7 +205,16 @@ export default function AdminDashboard() {
                       {user.role !== 'admin' && (
                         <>
                           <button 
-                            onClick={() => handleSuspendUser(user.id, user.status === 'suspended')}
+                            onClick={() => openConfirm(
+                              user.status === 'suspended' ? 'Reactivate User' : 'Suspend User',
+                              `Are you sure you want to ${user.status === 'suspended' ? 'reactivate' : 'suspend'} ${user.displayName}?`,
+                              () => {
+                                handleSuspendUser(user.id, user.status === 'suspended');
+                                closeConfirm();
+                              },
+                              user.status === 'suspended' ? 'Reactivate' : 'Suspend',
+                              user.status !== 'suspended'
+                            )}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition ${
                               user.status === 'suspended' 
                               ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' 
@@ -192,33 +228,22 @@ export default function AdminDashboard() {
                               <><Ban className="w-4 h-4"/> Suspend</>
                             )}
                           </button>
-                          {deletingUser === user.id ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-red-400 font-medium mr-1 text-nowrap">Are you sure?</span>
-                              <button 
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-bold transition"
-                                title="Confirm Delete"
-                              >
-                                Yes
-                              </button>
-                              <button 
-                                onClick={() => setDeletingUser(null)}
-                                className="px-2.5 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded text-sm font-medium transition"
-                                title="Cancel Delete"
-                              >
-                                No
-                              </button>
-                            </div>
-                          ) : (
-                            <button 
-                              onClick={() => setDeletingUser(user.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded text-sm font-medium transition"
-                              title="Delete User"
-                            >
-                              <Trash2 className="w-4 h-4"/> Delete
-                            </button>
-                          )}
+                          <button 
+                            onClick={() => openConfirm(
+                              'Delete User',
+                              `Are you sure you want to completely delete ${user.displayName}? This action cannot be reversed.`,
+                              () => {
+                                handleDeleteUser(user.id);
+                                closeConfirm();
+                              },
+                              'Delete User',
+                              true
+                            )}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded text-sm font-medium transition"
+                            title="Delete User"
+                          >
+                            <Trash2 className="w-4 h-4"/> Delete
+                          </button>
                         </>
                       )}
                     </td>
@@ -305,7 +330,7 @@ export default function AdminDashboard() {
                         {job.paymentStatus}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 flex items-center gap-2">
                       {job.paymentStatus === 'pending' && (
                         <button 
                           onClick={() => handleConfirmPayment(job.id)}
@@ -314,6 +339,22 @@ export default function AdminDashboard() {
                           Confirm
                         </button>
                       )}
+                      <button 
+                        onClick={() => openConfirm(
+                          'Delete Job',
+                          `Are you sure you want to delete the job "${job.title}"? This cannot be undone.`,
+                          () => {
+                            handleDeleteJob(job.id);
+                            closeConfirm();
+                          },
+                          'Delete Job',
+                          true
+                        )}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded text-sm font-medium transition"
+                        title="Delete Job"
+                      >
+                        <Trash2 className="w-4 h-4"/> Delete
+                      </button>
                     </td>
                   </tr>
                   );
@@ -324,6 +365,15 @@ export default function AdminDashboard() {
         )}
       </div>
 
+      <ConfirmModal 
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+        confirmText={confirmDialog.confirmText}
+        isDestructive={confirmDialog.isDestructive}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link } from 'react-router-dom';
 import NavBar from './NavBar';
 
 export default function MainLayout() {
@@ -13,10 +13,10 @@ export default function MainLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center text-sm text-zinc-400">
           <p>© {new Date().getFullYear()} Workers Guild Jamaica. All rights reserved.</p>
           <div className="flex gap-4 mt-4 md:mt-0">
-            <a href="/support" className="hover:text-yellow-400 transition-colors">Support</a>
-            <a href="/help" className="hover:text-yellow-400 transition-colors">Help Center</a>
-            <a href="/privacy" className="hover:text-yellow-400 transition-colors">Privacy</a>
-            <a href="/terms" className="hover:text-yellow-400 transition-colors">Terms</a>
+            <Link to="/support" className="hover:text-yellow-400 transition-colors">Support</Link>
+            <Link to="/help" className="hover:text-yellow-400 transition-colors">Help Center</Link>
+            <Link to="/privacy" className="hover:text-yellow-400 transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-yellow-400 transition-colors">Terms</Link>
           </div>
         </div>
       </footer>

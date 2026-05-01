@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { UserProfile } from '../contexts/AuthContext';
+import { useAuth, UserProfile } from '../contexts/AuthContext';
 import { Star, MapPin, Loader2, ArrowLeft, ShieldCheck, Mail, CheckCircle, Phone, MessageCircle, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -26,6 +26,9 @@ export default function WorkerProfilePage() {
   const [worker, setWorker] = useState<WorkerProfile | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
+  const [hasPaidJob, setHasPaidJob] = useState(false);
+  const { currentUser } = useAuth(); // need to import useAuth and query, collection, where, getDocs
+
   useEffect(() => {
     async function fetchWorker() {
       if (!id) return;
@@ -44,6 +47,20 @@ export default function WorkerProfilePage() {
           if (userSnap.exists()) {
             setUserProfile(userSnap.data() as UserProfile);
           }
+
+          // Check if currentUser has paid this worker
+          if (currentUser) {
+            const q = query(
+              collection(db, 'jobs'),
+              where('customerId', '==', currentUser.uid),
+              where('workerId', '==', id),
+              where('paymentStatus', '==', 'paid')
+            );
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+              setHasPaidJob(true);
+            }
+          }
         } else {
           setWorker(null);
         }
@@ -56,7 +73,7 @@ export default function WorkerProfilePage() {
     }
 
     fetchWorker();
-  }, [id]);
+  }, [id, currentUser]);
 
   if (loading) {
     return (
@@ -171,44 +188,46 @@ export default function WorkerProfilePage() {
               <div className="pt-4 border-t border-zinc-800 space-y-3">
                 <Link 
                   to="/employer/post-job"
-                  state={{ category: worker.category }}
-                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-bold py-3 px-4 rounded-xl transition-colors focus:ring-2 focus:ring-yellow-500 focus:outline-none flex justify-center"
+                  state={{ category: worker.category, workerId: worker.userId }}
+                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-bold py-3 px-4 rounded-xl transition-colors focus:ring-2 focus:ring-yellow-500 focus:outline-none flex justify-center mt-2"
                 >
                   Hire Me
                 </Link>
                 
-                {worker.phoneNumber ? (
-                  <div className="space-y-3 pt-2">
-                    {worker.hasWhatsApp && (
-                      <a 
-                        href={`https://wa.me/${worker.phoneNumber.replace(/\D/g,'')}?text=Hi%20I%20found%20you%20on%20Workers%20Guild%20and%20I%20need%20a%20job%20done`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                      >
-                        <MessageCircle className="w-5 h-5" /> Contact on WhatsApp
-                      </a>
-                    )}
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <a 
-                        href={`tel:+${worker.phoneNumber.replace(/\D/g,'')}`}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-zinc-500 focus:outline-none"
-                      >
-                        <Phone className="w-4 h-4" /> Call Worker
-                      </a>
-                      <a 
-                        href={`sms:+${worker.phoneNumber.replace(/\D/g,'')}`}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-zinc-500 focus:outline-none"
-                      >
-                        <MessageSquare className="w-4 h-4" /> Send Text
-                      </a>
+                {hasPaidJob && (
+                  worker.phoneNumber ? (
+                    <div className="space-y-3 pt-2">
+                      {worker.hasWhatsApp && (
+                        <a 
+                          href={`https://wa.me/${worker.phoneNumber.replace(/\D/g,'')}?text=Hi%20I%20found%20you%20on%20Workers%20Guild%20and%20I%20need%20a%20job%20done`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
+                        >
+                          <MessageCircle className="w-5 h-5" /> Contact on WhatsApp
+                        </a>
+                      )}
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <a 
+                          href={`tel:+${worker.phoneNumber.replace(/\D/g,'')}`}
+                          className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-zinc-500 focus:outline-none"
+                        >
+                          <Phone className="w-4 h-4" /> Call Worker
+                        </a>
+                        <a 
+                          href={`sms:+${worker.phoneNumber.replace(/\D/g,'')}`}
+                          className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-zinc-500 focus:outline-none"
+                        >
+                          <MessageSquare className="w-4 h-4" /> Send Text
+                        </a>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="pt-2 text-center text-zinc-500 text-sm border border-zinc-800 border-dashed rounded-xl py-4 bg-zinc-900/50">
-                    Contact not available
-                  </div>
+                  ) : (
+                    <div className="pt-2 text-center text-zinc-500 text-sm border border-zinc-800 border-dashed rounded-xl py-4 bg-zinc-900/50">
+                      Contact not available
+                    </div>
+                  )
                 )}
               </div>
             </div>

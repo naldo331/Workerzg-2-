@@ -94,7 +94,9 @@ export default function CustomerDashboard() {
               <li key={job.id} className="p-6 hover:bg-zinc-800/50 transition-colors">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-bold text-zinc-100 text-lg">{job.title}</h3>
+                    <Link to={`/job/${job.id}`} className="hover:text-yellow-500 transition-colors">
+                      <h3 className="font-bold text-zinc-100 text-lg">{job.title}</h3>
+                    </Link>
                     <div className="flex gap-3 text-sm text-zinc-400 mt-1">
                       <span>{job.category}</span>
                       <span>•</span>
@@ -113,10 +115,19 @@ export default function CustomerDashboard() {
                         {job.status}
                       </span>
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize
-                        ${job.paymentStatus === 'paid' ? 'bg-green-500/10 text-green-400' : 'bg-zinc-800 text-zinc-400'}`}
+                        ${job.paymentStatus === 'paid' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'}`}
                       >
                         {job.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
                       </span>
+                      {job.paymentStatus === 'pending' && (
+                        <a 
+                          href="https://wipaycaribbean.com/" 
+                          target="_blank" rel="noreferrer"
+                          className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500 text-zinc-900 hover:bg-yellow-400 transition-colors inline-block"
+                        >
+                          Pay Now
+                        </a>
+                      )}
                       {job.status === 'open' && (
                         <Link 
                           to={`/employer/edit-job/${job.id}`} 
