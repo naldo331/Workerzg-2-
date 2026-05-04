@@ -20,7 +20,8 @@ export default function SignupPage() {
       role: defaultRole,
       startingPrice: '',
       phoneNumber: '',
-      hasWhatsApp: false
+      hasWhatsApp: false,
+      agreedToTerms: false
     }
   });
   const [loading, setLoading] = useState(false);
@@ -220,6 +221,29 @@ export default function SignupPage() {
                 </div>
               </div>
             )}
+
+            {/* User Agreement Checkbox */}
+            <div className="pt-4 border-t border-zinc-800">
+              <div className="flex items-start">
+                <div className="flex items-center h-5">
+                  <input
+                    {...register('agreedToTerms', { required: 'You must agree to the Terms and Privacy Policy' })}
+                    type="checkbox"
+                    id="agreedToTerms"
+                    className="h-4 w-4 text-yellow-500 focus:ring-yellow-500 border-zinc-700 rounded bg-zinc-950"
+                  />
+                </div>
+                <div className="ml-3 text-sm">
+                  <label htmlFor="agreedToTerms" className="text-zinc-300">
+                    I agree to the{' '}
+                    <Link to="/terms" target="_blank" className="text-yellow-500 hover:text-yellow-400 underline">Terms of Service</Link>
+                    {' '}and{' '}
+                    <Link to="/privacy" target="_blank" className="text-yellow-500 hover:text-yellow-400 underline">Privacy Policy</Link>
+                  </label>
+                  {errors.agreedToTerms && <p className="mt-1 text-xs text-red-500">{errors.agreedToTerms.message as string}</p>}
+                </div>
+              </div>
+            </div>
 
           </div>
 

@@ -180,7 +180,8 @@ export default function CustomerDashboard() {
                       {job.status === 'in_progress' && (
                         <div className="space-y-3">
                           <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg text-sm text-blue-400">
-                            Payment secured. Funds are safely held by Workers Guild until job completion.
+                            <strong>Payment secured. Funds are safely held by Workers Guild.</strong><br/>
+                            You are protected. Payment is only released after completion confirmation.
                           </div>
                           {job.workerId && (
                             <div className="flex flex-col gap-1 p-3 bg-zinc-950 rounded border border-zinc-800 text-sm">

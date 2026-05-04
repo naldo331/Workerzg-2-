@@ -65,7 +65,7 @@ export default function PostJobPage() {
                </svg>
              </div>
              <div>
-               <p className="font-bold text-base mb-1">To contact this worker and secure the job, a service fee payment is required.</p>
+               <p className="font-bold text-base mb-1">Your payment is secure and will NOT be released to the worker until the job is completed and confirmed.</p>
                <p>Once you submit this form, please proceed to pay your platform fee to unlock contact information and initiate the job. A platform fee of 5% will be applied.</p>
              </div>
           </div>
