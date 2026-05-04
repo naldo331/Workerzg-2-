@@ -196,13 +196,22 @@ export default function HomePage() {
 
             <div className="flex w-full md:w-48 xl:w-56 items-center px-4 h-12 bg-zinc-800/50 md:bg-transparent rounded-xl md:rounded-none text-zinc-200 hover:bg-zinc-800/70 md:hover:bg-transparent transition-colors">
               <MapPin className="w-5 h-5 text-zinc-400 shrink-0" />
-              <input 
-                type="text" 
-                placeholder="Where?"
-                className="w-full pl-3 focus:outline-none bg-transparent placeholder-zinc-500 text-base"
+              <select 
+                className="w-full pl-3 focus:outline-none bg-transparent placeholder-zinc-500 text-base cursor-pointer appearance-none"
                 value={heroLocation}
                 onChange={(e) => setHeroLocation(e.target.value)}
-              />
+              >
+                <option value="" className="bg-zinc-900 text-zinc-400">Select Parish</option>
+                {[
+                  "Clarendon", "Hanover", "Kingston", "Manchester", "Portland",
+                  "St. Andrew", "St. Ann", "St. Catherine", "St. Elizabeth",
+                  "St. James", "St. Mary", "St. Thomas", "Trelawny", "Westmoreland"
+                ].map((parish) => (
+                  <option key={parish} value={parish} className="bg-zinc-900 text-white">
+                    {parish}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <button type="submit" className="w-full md:w-auto h-12 md:h-11 bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-bold px-8 rounded-xl md:rounded-full transition-colors shrink-0">

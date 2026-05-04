@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import UserProfileHeader from '../../components/profile/UserProfileHeader';
+import DisputeModal from '../../components/ui/DisputeModal';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 
 export default function WorkerDashboard() {
@@ -28,6 +29,8 @@ export default function WorkerDashboard() {
     message: '',
     onConfirm: () => {}
   });
+
+  const [disputeModalJobId, setDisputeModalJobId] = useState<string | null>(null);
 
   const openConfirm = (title: string, message: string, onConfirm: () => void, confirmText = "Confirm", isDestructive = true) => {
     setConfirmDialog({ isOpen: true, title, message, onConfirm, confirmText, isDestructive });
@@ -89,16 +92,16 @@ export default function WorkerDashboard() {
     try {
       const jobRef = doc(db, 'jobs', jobId);
       await updateDoc(jobRef, {
-        status: 'assigned',
+        status: 'awaiting_payment',
         workerId: currentUser.uid,
         updatedAt: Date.now()
       });
-      toast.success("Job accepted successfully!");
+      toast.success("Job accepted successfully! Awaiting payment.");
       // Optimistic update
       const job = openJobs.find(j => j.id === jobId);
       if (job) {
         setOpenJobs(openJobs.filter(j => j.id !== jobId));
-        setMyJobs([{ ...job, status: 'assigned', workerId: currentUser.uid }, ...myJobs]);
+        setMyJobs([{ ...job, status: 'awaiting_payment', workerId: currentUser.uid }, ...myJobs]);
       }
     } catch (error) {
       console.error(error);
@@ -128,11 +131,11 @@ export default function WorkerDashboard() {
     try {
       const jobRef = doc(db, 'jobs', jobId);
       await updateDoc(jobRef, {
-        status: 'completed',
+        status: 'awaiting_confirmation',
         updatedAt: Date.now()
       });
-      toast.success("Job marked as completed!");
-      setMyJobs(myJobs.map(j => j.id === jobId ? { ...j, status: 'completed' } : j));
+      toast.success("Job marked as completed! Awaiting employer confirmation.");
+      setMyJobs(myJobs.map(j => j.id === jobId ? { ...j, status: 'awaiting_confirmation' } : j));
     } catch (error) {
       console.error(error);
       toast.error("Failed to complete job.");
@@ -221,9 +224,14 @@ export default function WorkerDashboard() {
                       <h3 className="font-bold text-zinc-100">{job.title}</h3>
                       <div className="text-right">
                         <span className="font-bold text-zinc-100">${job.budget.toLocaleString()} JMD</span>
-                        <div className="mt-1">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${job.status === 'completed' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                            {job.status}
+                        <div className="mt-1 flex flex-col gap-1 items-end">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize 
+                            ${job.status === 'completed' ? 'bg-green-500/10 text-green-400' : 
+                              job.status === 'in_progress' ? 'bg-blue-500/10 text-blue-400' :
+                              job.status === 'awaiting_confirmation' ? 'bg-purple-500/10 text-purple-400' :
+                              job.status === 'disputed' ? 'bg-red-500/10 text-red-500' :
+                              'bg-yellow-500/10 text-yellow-500'}`}>
+                            {job.status.replace('_', ' ')}
                           </span>
                         </div>
                       </div>
@@ -241,37 +249,67 @@ export default function WorkerDashboard() {
                       </div>
                     )}
                     <p className="text-sm text-zinc-400 mb-3">{job.location}</p>
+
+                    {job.status === 'awaiting_payment' && (
+                       <div className="pt-3 border-t border-zinc-800 flex justify-between items-center">
+                         <div className="w-full flex justify-between items-center bg-yellow-500/5 p-2 rounded border border-yellow-500/20">
+                           <span className="text-xs text-yellow-500">Wait for client to pay upfront.</span>
+                           <button
+                             onClick={() => openConfirm('Decline Job', 'Decline?', () => { handleDeclineJob(job.id); closeConfirm(); }, 'Decline', true)}
+                             className="text-xs text-zinc-400 hover:text-red-500 underline"
+                           >
+                             Cancel
+                           </button>
+                         </div>
+                       </div>
+                    )}
                     
-                    {job.status === 'assigned' && (
-                      <div className="pt-3 border-t border-zinc-800 flex justify-between items-center">
-                        {job.paymentStatus === 'pending' ? (
-                           <div className="flex w-full items-center justify-between">
-                             <span className="text-xs font-bold text-red-500 bg-red-500/10 px-3 py-1.5 rounded">Awaiting Client Payment</span>
-                             <button
-                               onClick={() => openConfirm(
-                                 'Decline Job request',
-                                 'Are you sure you want to decline this job request?',
-                                 () => {
-                                   handleDeclineJob(job.id);
-                                   closeConfirm();
-                                 },
-                                 'Decline',
-                                 true
-                               )}
-                               className="text-xs text-zinc-400 hover:text-red-500 transition-colors underline"
-                             >
-                               Decline
-                             </button>
-                           </div>
-                        ) : (
+                    {job.status === 'in_progress' && (
+                      <div className="pt-3 border-t border-zinc-800 space-y-3">
+                        <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg text-sm text-green-400">
+                          Payment is secured and guaranteed once the job is completed.
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <button 
+                            onClick={() => setDisputeModalJobId(job.id)}
+                            className="text-xs text-red-400 hover:text-red-300 underline"
+                          >
+                            Report Issue
+                          </button>
                           <button 
                             onClick={() => handleCompleteJob(job.id)}
-                            className="text-sm bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-md font-semibold transition-colors ml-auto"
+                            className="text-sm bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 rounded-lg font-bold transition-colors"
                           >
-                            Mark as Completed
+                            Mark Job as Done
                           </button>
-                        )}
+                        </div>
                       </div>
+                    )}
+
+                    {job.status === 'awaiting_confirmation' && (
+                      <div className="pt-3 border-t border-zinc-800 space-y-2">
+                        <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg text-sm text-yellow-500">
+                           Awaiting Employer Confirmation. Auto-release in 24-48 hours.
+                        </div>
+                        <button 
+                          onClick={() => setDisputeModalJobId(job.id)}
+                          className="text-xs text-red-400 hover:text-red-300 underline"
+                        >
+                          Report Issue
+                        </button>
+                      </div>
+                    )}
+                    
+                    {job.status === 'completed' && (
+                       <div className="pt-3 border-t border-zinc-800">
+                          <span className="text-sm text-green-400 font-medium">Payment Released.</span>
+                       </div>
+                    )}
+                    
+                    {job.status === 'disputed' && (
+                       <div className="pt-3 border-t border-zinc-800">
+                          <span className="text-sm text-red-400 font-medium">Dispute is under review.</span>
+                       </div>
                     )}
                   </div>
                 ))}
@@ -290,6 +328,14 @@ export default function WorkerDashboard() {
         onCancel={closeConfirm}
         confirmText={confirmDialog.confirmText}
         isDestructive={confirmDialog.isDestructive}
+      />
+      <DisputeModal 
+        isOpen={!!disputeModalJobId}
+        onClose={() => setDisputeModalJobId(null)}
+        jobId={disputeModalJobId!}
+        onDisputeRaised={() => {
+          setMyJobs(myJobs.map(j => j.id === disputeModalJobId ? { ...j, status: 'disputed' } : j));
+        }}
       />
     </div>
   );

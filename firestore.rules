@@ -46,8 +46,8 @@ service cloud.firestore {
         && data.category is string && data.category.size() <= 64
         && data.location is string && data.location.size() <= 256
         && data.budget is number
-        && data.status in ['open', 'assigned', 'completed', 'cancelled']
-        && data.paymentStatus in ['pending', 'paid']
+        && data.status in ['open', 'assigned', 'completed', 'cancelled', 'awaiting_payment', 'in_progress', 'awaiting_confirmation', 'disputed']
+        && data.paymentStatus in ['pending', 'paid', 'refunded']
         && data.createdAt is number
         && data.updatedAt is number;
     }
@@ -108,18 +108,24 @@ service cloud.firestore {
       allow create: if isSignedIn() 
         && isValidJob(incoming())
         && incoming().customerId == request.auth.uid
-        && incoming().status == 'open'
+        && incoming().status in ['open', 'awaiting_payment']
         && incoming().paymentStatus == 'pending';
         
       allow update: if isSignedIn() && (
         isAdmin() || 
         (request.auth.uid == existing().customerId && existing().status == 'open' && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'category', 'location', 'budget', 'status', 'updatedAt', 'paymentStatus'])) ||
         (request.auth.uid == existing().customerId && existing().status != 'open' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'paymentStatus'])) ||
-        (existing().status == 'open' && incoming().status == 'assigned' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workerId', 'updatedAt']) && incoming().workerId == request.auth.uid) ||
+        (existing().status == 'open' && incoming().status == 'awaiting_payment' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workerId', 'updatedAt']) && incoming().workerId == request.auth.uid) ||
         (request.auth.uid == existing().workerId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
       );
       
       allow delete: if isAdmin();
+    }
+
+    match /disputes/{disputeId} {
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.raisedBy);
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
     }
 
     match /transactions/{transactionId} {

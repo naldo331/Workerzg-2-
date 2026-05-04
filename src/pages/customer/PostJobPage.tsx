@@ -36,7 +36,7 @@ export default function PostJobPage() {
         category: data.category,
         location: `${data.town}, ${data.parish}`,
         budget: budget,
-        status: preSelectedWorkerId ? 'assigned' : 'open',
+        status: preSelectedWorkerId ? 'awaiting_payment' : 'open',
         paymentStatus: 'pending',
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -173,7 +173,6 @@ export default function PostJobPage() {
             >
               {loading ? 'Processing...' : (preSelectedWorkerId ? 'Create Job Request' : 'Post Job')}
             </button>
-            <p className="text-xs text-center text-zinc-500 mt-3">Platform fee (5%) will be added at checkout.</p>
           </div>
 
         </form>

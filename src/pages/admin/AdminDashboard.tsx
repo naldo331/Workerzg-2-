@@ -3,6 +3,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firesto
 import { db } from '../../lib/firebase';
 import toast from 'react-hot-toast';
 import { Users, Briefcase, DollarSign, Ban, CheckCircle, XCircle, Trash2, Shield, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import UserProfileHeader from '../../components/profile/UserProfileHeader';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 
@@ -10,8 +11,10 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
+  const [disputes, setDisputes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'workers' | 'jobs'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'workers' | 'jobs' | 'disputes'>('users');
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -46,6 +49,10 @@ export default function AdminDashboard() {
         const jSnap = await getDocs(collection(db, 'jobs'));
         const jData = jSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => b.createdAt - a.createdAt);
         setJobs(jData);
+
+        const dSnap = await getDocs(collection(db, 'disputes'));
+        const dData = dSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => b.createdAt - a.createdAt);
+        setDisputes(dData);
 
       } catch (err) {
         console.error(err);
@@ -116,6 +123,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleResolveDispute = async (disputeId: string, jobId: string, action: 'release_worker' | 'refund_client') => {
+    try {
+      // update dispute
+      await updateDoc(doc(db, 'disputes', disputeId), { status: 'resolved', resolution: action });
+      // update job
+      await updateDoc(doc(db, 'jobs', jobId), {
+        status: action === 'release_worker' ? 'completed' : 'cancelled', // Or whatever terminal status 
+        paymentStatus: action === 'refund_client' ? 'refunded' : 'paid',
+        updatedAt: Date.now()
+      });
+      toast.success(`Dispute resolved: ${action === 'release_worker' ? 'Paid to worker' : 'Refunded to client'}`);
+      setDisputes(disputes.map(d => d.id === disputeId ? { ...d, status: 'resolved', resolution: action } : d));
+      setJobs(jobs.map(j => j.id === jobId ? { ...j, status: action === 'release_worker' ? 'completed' : 'cancelled' } : j));
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Failed to resolve dispute");
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div></div>;
   }
@@ -165,9 +191,15 @@ export default function AdminDashboard() {
         </button>
         <button 
           onClick={() => setActiveTab('jobs')}
-          className={`pb-2 font-medium transition-colors ${activeTab === 'jobs' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+          className={`pb-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'jobs' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-zinc-500 hover:text-zinc-300'}`}
         >
           Jobs Monitoring
+        </button>
+        <button 
+          onClick={() => setActiveTab('disputes')}
+          className={`pb-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'disputes' ? 'text-red-500 border-b-2 border-red-500' : 'text-zinc-500 hover:text-red-400'}`}
+        >
+          Disputes {disputes.filter(d => d.status === 'open').length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{disputes.filter(d => d.status === 'open').length}</span>}
         </button>
       </div>
 
@@ -295,8 +327,29 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'jobs' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-zinc-300">
+          <div className="flex flex-col">
+            <div className="flex gap-4 p-4 border-b border-zinc-800 bg-zinc-800/20 overflow-x-auto">
+              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-800 flex flex-col min-w-[140px]">
+                <span className="text-sm font-medium text-zinc-400">Total Jobs</span>
+                <span className="text-2xl font-bold text-zinc-100">{jobs.length}</span>
+              </div>
+              <div className="bg-yellow-500/10 p-4 rounded-lg border border-yellow-500/20 flex flex-col min-w-[140px]">
+                <span className="text-sm font-medium text-yellow-500">In Progress</span>
+                <span className="text-2xl font-bold text-yellow-500">{jobs.filter(j => j.status === 'in_progress').length}</span>
+              </div>
+              <div className="bg-purple-500/10 p-4 rounded-lg border border-purple-500/20 flex flex-col min-w-[140px]">
+                <span className="text-sm font-medium text-purple-400">Worker Finished</span>
+                <span className="text-2xl font-bold text-purple-400">{jobs.filter(j => j.status === 'awaiting_confirmation').length}</span>
+                <span className="text-xs text-purple-400/60 mt-1">Awaiting Client</span>
+              </div>
+              <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/20 flex flex-col min-w-[140px]">
+                <span className="text-sm font-medium text-green-400">Fully Completed</span>
+                <span className="text-2xl font-bold text-green-400">{jobs.filter(j => j.status === 'completed').length}</span>
+                <span className="text-xs text-green-400/60 mt-1">Funds Released</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-zinc-300">
               <thead className="bg-zinc-800/50 text-zinc-400 text-sm">
                 <tr>
                   <th className="px-6 py-4 font-semibold">Job Title</th>
@@ -310,8 +363,11 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-zinc-800">
                 {jobs.map(job => {
                   const assignedUser = job.workerId ? users.find(u => u.id === job.workerId) : null;
+                  const isExpanded = expandedJobId === job.id;
+                  
                   return (
-                  <tr key={job.id} className="hover:bg-zinc-800/30">
+                  <React.Fragment key={job.id}>
+                  <tr className="hover:bg-zinc-800/30 cursor-pointer" onClick={() => setExpandedJobId(isExpanded ? null : job.id)}>
                     <td className="px-6 py-4">
                       <p className="font-medium text-zinc-100">{job.title}</p>
                       <p className="text-xs text-zinc-500">ID: {job.id.slice(0,8)}</p>
@@ -324,7 +380,17 @@ export default function AdminDashboard() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-yellow-500 font-medium">${job.budget.toLocaleString()}</td>
-                    <td className="px-6 py-4 capitalize text-sm">{job.status}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-full font-medium capitalize flex w-fit gap-1 items-center
+                        ${job.status === 'completed' ? 'bg-green-500/10 text-green-400' : 
+                          job.status === 'in_progress' ? 'bg-blue-500/10 text-blue-400' :
+                          job.status === 'awaiting_confirmation' ? 'bg-purple-500/10 text-purple-400' :
+                          job.status === 'disputed' ? 'bg-red-500/10 text-red-500' :
+                          job.status === 'awaiting_payment' ? 'bg-yellow-500/10 text-yellow-500' :
+                          'bg-zinc-800 text-zinc-300'}`}>
+                        {job.status.replace('_', ' ')}
+                      </span>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs rounded-full ${job.paymentStatus === 'paid' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-500'}`}>
                         {job.paymentStatus}
@@ -333,14 +399,16 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 flex items-center gap-2">
                       {job.paymentStatus === 'pending' && (
                         <button 
-                          onClick={() => handleConfirmPayment(job.id)}
+                          onClick={(e) => { e.stopPropagation(); handleConfirmPayment(job.id); }}
                           className="bg-yellow-500 text-zinc-900 px-3 py-1.5 rounded text-sm font-semibold hover:bg-yellow-400 transition"
                         >
                           Confirm
                         </button>
                       )}
                       <button 
-                        onClick={() => openConfirm(
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openConfirm(
                           'Delete Job',
                           `Are you sure you want to delete the job "${job.title}"? This cannot be undone.`,
                           () => {
@@ -349,7 +417,8 @@ export default function AdminDashboard() {
                           },
                           'Delete Job',
                           true
-                        )}
+                          );
+                        }}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded text-sm font-medium transition"
                         title="Delete Job"
                       >
@@ -357,10 +426,157 @@ export default function AdminDashboard() {
                       </button>
                     </td>
                   </tr>
+                  
+                  {isExpanded && (
+                    <tr className="bg-zinc-800/20 border-b border-zinc-800">
+                      <td colSpan={6} className="px-6 py-6">
+                        <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
+                           <div className="flex justify-between items-center pb-3 border-b border-zinc-800">
+                              <h4 className="text-zinc-100 font-semibold flex items-center gap-2">
+                                <Briefcase className="w-4 h-4" />
+                                Job Completion Status
+                              </h4>
+                           </div>
+                           
+                           <div className="grid grid-cols-2 gap-6">
+                             {/* Worker Section */}
+                             <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl space-y-3">
+                               <div className="flex items-center gap-2 text-zinc-400 font-medium text-sm mb-4">
+                                  <span>Worker Status</span>
+                               </div>
+                               
+                               {job.workerId ? (
+                                  <>
+                                    <div className="flex items-center gap-3 bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 
+                                        ${['awaiting_confirmation', 'completed'].includes(job.status) ? 'bg-green-500/20 text-green-500' : 'bg-zinc-800 text-zinc-500'}
+                                      `}>
+                                        <CheckCircle className="w-5 h-5" />
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-semibold text-zinc-300">
+                                          {['awaiting_confirmation', 'completed'].includes(job.status) ? 'Marked as Done' : 'Working / Pending'}
+                                        </p>
+                                        <p className="text-xs text-zinc-500">
+                                          {['awaiting_confirmation', 'completed'].includes(job.status) 
+                                            ? 'The worker has indicated the job is complete.' 
+                                            : 'The worker has not yet completed the job.'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </>
+                               ) : (
+                                 <div className="text-sm text-zinc-500 italic p-3">No worker assigned yet.</div>
+                               )}
+                             </div>
+                             
+                             {/* Employer Section */}
+                             <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl space-y-3">
+                               <div className="flex items-center gap-2 text-zinc-400 font-medium text-sm mb-4">
+                                  <span>Employer Status</span>
+                               </div>
+                               
+                               <div className="flex items-center gap-3 bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 
+                                    ${job.status === 'completed' ? 'bg-green-500/20 text-green-500' : 'bg-zinc-800 text-zinc-500'}
+                                  `}>
+                                    <CheckCircle className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-semibold text-zinc-300">
+                                      {job.status === 'completed' ? 'Confirmed Complete' : 'Awaiting Confirmation'}
+                                    </p>
+                                    <p className="text-xs text-zinc-500">
+                                      {job.status === 'completed' 
+                                        ? 'The employer confirmed the job is finished.' 
+                                        : 'The employer has not yet confirmed completion.'}
+                                    </p>
+                                  </div>
+                                </div>
+                             </div>
+                           </div>
+                           
+                           {/* Details context string */}
+                          <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg text-sm text-blue-400 flex items-start gap-3 mt-2">
+                             <Shield className="w-5 h-5 shrink-0 mt-0.5" />
+                             <p>
+                               Once a worker marks the job as done, the status becomes <strong>Awaiting Confirmation</strong>. 
+                               If the employer confirms, or if 24-48 hours pass without a dispute, the platform auto-releases the funds.
+                             </p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+          </div>
+        )}
+        
+        {activeTab === 'disputes' && (
+          <div className="p-6">
+            {disputes.length === 0 ? (
+              <p className="text-zinc-500">No disputes recorded.</p>
+            ) : (
+              <div className="space-y-6">
+                {disputes.map(dispute => {
+                  const correlatedJob = jobs.find(j => j.id === dispute.jobId) || {};
+                  return (
+                    <div key={dispute.id} className="border border-zinc-800 rounded-xl p-4 bg-zinc-800/20">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-bold text-zinc-100 flex items-center gap-2">
+                             Dispute for Job: <Link to={`/job/${dispute.jobId}`} className="text-yellow-500 hover:underline">{correlatedJob.title || dispute.jobId}</Link>
+                             <span className={`px-2 py-0.5 text-xs rounded-full ${dispute.status === 'open' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-400'}`}>
+                               {dispute.status === 'open' ? 'Action Required' : 'Resolved'}
+                             </span>
+                          </h4>
+                          <p className="text-sm text-zinc-400 mt-1">Raised by: {dispute.raisedBy === correlatedJob.customerId ? 'Employer' : 'Worker'} on {new Date(dispute.createdAt).toLocaleString()}</p>
+                        </div>
+                        {dispute.status === 'open' && (
+                          <div className="flex gap-2">
+                            <button 
+                               onClick={() => openConfirm('Refund Employer', 'Return held funds to the employer?', () => { handleResolveDispute(dispute.id, dispute.jobId, 'refund_client'); closeConfirm(); }, 'Refund', true)}
+                               className="bg-red-500/10 text-red-400 hover:bg-red-500/20 px-3 py-1.5 rounded text-sm font-semibold transition"
+                            >
+                              Refund Employer
+                            </button>
+                            <button 
+                               onClick={() => openConfirm('Release Payment', 'Release held funds to the worker?', () => { handleResolveDispute(dispute.id, dispute.jobId, 'release_worker'); closeConfirm(); }, 'Release Payment', false)}
+                               className="bg-green-500/10 text-green-400 hover:bg-green-500/20 px-3 py-1.5 rounded text-sm font-semibold transition"
+                            >
+                              Release to Worker
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-800">
+                        <h5 className="text-sm font-semibold text-zinc-300 mb-2">Message:</h5>
+                        <p className="text-zinc-400 text-sm whitespace-pre-wrap">{dispute.message}</p>
+                      </div>
+
+                      {dispute.images && dispute.images.length > 0 && (
+                        <div className="mt-4">
+                          <h5 className="text-sm font-semibold text-zinc-300 mb-2">Proof Photos:</h5>
+                          <div className="flex gap-4 overflow-x-auto pb-2">
+                            {dispute.images.map((img: string, i: number) => (
+                              <a href={img} target="_blank" rel="noreferrer" key={i}>
+                                <img src={img} alt="Proof" className="w-32 h-32 object-cover rounded-lg border border-zinc-700 hover:opacity-80 transition cursor-pointer" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

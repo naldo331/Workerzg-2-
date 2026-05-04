@@ -27,7 +27,7 @@ export default function WorkerProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const [hasPaidJob, setHasPaidJob] = useState(false);
-  const { currentUser } = useAuth(); // need to import useAuth and query, collection, where, getDocs
+  const { currentUser, userProfile: currentUserProfile } = useAuth(); // need to import useAuth and query, collection, where, getDocs
 
   useEffect(() => {
     async function fetchWorker() {
@@ -186,13 +186,28 @@ export default function WorkerProfilePage() {
               </div>
 
               <div className="pt-4 border-t border-zinc-800 space-y-3">
-                <Link 
-                  to="/employer/post-job"
-                  state={{ category: worker.category, workerId: worker.userId }}
-                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-bold py-3 px-4 rounded-xl transition-colors focus:ring-2 focus:ring-yellow-500 focus:outline-none flex justify-center mt-2"
-                >
-                  Hire Me
-                </Link>
+                {currentUserProfile?.role === 'admin' ? (
+                  <button 
+                    onClick={() => toast.error('Admins cannot hire workers. Please use a customer account.')}
+                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 px-4 rounded-xl transition-colors focus:ring-2 focus:ring-zinc-500 focus:outline-none flex justify-center mt-2 cursor-not-allowed"
+                  >
+                    Hire Me
+                  </button>
+                ) : (
+                  <Link 
+                    to={currentUser ? "/employer/post-job" : "/login"}
+                    state={currentUser ? { category: worker.category, workerId: worker.userId } : undefined}
+                    onClick={(e) => {
+                      if (!currentUser) {
+                        e.preventDefault();
+                        toast.error("Please sign in to hire a worker.");
+                      }
+                    }}
+                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-bold py-3 px-4 rounded-xl transition-colors focus:ring-2 focus:ring-yellow-500 focus:outline-none flex justify-center mt-2"
+                  >
+                    Hire Me
+                  </Link>
+                )}
                 
                 {hasPaidJob && (
                   worker.phoneNumber ? (
